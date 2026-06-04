@@ -94,6 +94,34 @@
     color:var(--glow);transition:border-color .2s,transform .2s;}
   .player-btn:hover{border-color:rgba(255,130,70,0.7);transform:scale(1.06);}
   .player-btn svg{width:18px;height:18px;fill:currentColor;display:block;}
+
+  /* ---- day/night toggle (top left) ---- */
+  .mode-btn{position:fixed;top:18px;left:18px;z-index:6;
+    width:44px;height:44px;border-radius:50%;
+    background:rgba(20,8,10,0.55);border:1px solid var(--line);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+    color:var(--glow);transition:border-color .2s,transform .2s,background .9s ease,color .9s ease;}
+  .mode-btn:hover{border-color:rgba(255,130,70,0.7);transform:scale(1.06);}
+  .mode-btn svg{width:20px;height:20px;fill:currentColor;display:block;}
+
+  /* ---- fluid theme transitions ---- */
+  .hero h1,.hero .kicker,.hero .sub{transition:color .9s ease,text-shadow .9s ease;}
+  .halls,footer{transition:background .9s ease;}
+  .card{transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease,background .9s ease;}
+  .halls .lede,.halls .eyebrow,.card h3,.card p,.card .no,.tag{transition:color .9s ease,background .9s ease,border-color .9s ease;}
+
+  /* ---- DAY MODE ---- */
+  body.day{--ink:#2c2030;--ink-dim:#7a6470;--glow:#c2702e;
+    --panel:rgba(255,251,245,0.72);--line:rgba(120,90,70,0.28);}
+  body.day .player-btn,body.day .mode-btn{background:rgba(255,250,244,0.62);color:#c2702e;border-color:rgba(120,90,70,0.32);}
+  body.day .hero h1{color:#241826;text-shadow:0 0 22px rgba(255,225,160,0.7),0 4px 0 rgba(255,255,255,0.35);}
+  body.day .hero .kicker{color:#5a4856;text-shadow:0 1px 3px rgba(255,255,255,0.6);}
+  body.day .hero .sub{color:#322734;text-shadow:0 1px 2px rgba(255,255,255,0.5);}
+  body.day .hint{color:#5a4856;}
+  body.day .halls{background:linear-gradient(180deg,transparent,rgba(244,238,228,0.55)18%,rgba(244,238,228,0.92) 100%);}
+  body.day footer{background:rgba(244,238,228,0.92);}
+  body.day .scan{opacity:0.02;}
 </style>
 </head>
 <body>
@@ -102,6 +130,7 @@
   <div class="scan"></div>
   <div class="vignette"></div>
 
+  <button id="modeBtn" class="mode-btn" aria-label="Toggle day or night"></button>
   <button id="playerBtn" class="player-btn" aria-label="Play music"></button>
   <!-- EDIT: replace song.mp3 with your own audio file in the repo (see note) -->
   <audio id="song" src="song.mp3" loop preload="auto"></audio>
@@ -175,6 +204,59 @@
   let W, H, DPR, horizon;
   let mouse = {x:0.5, y:0.5};
 
+  /* ===== day / night ===== */
+  let dayTarget=0, dayness=0, CUR=null;            // 0 = night, 1 = day
+  const lerp=(a,b,t)=>a+(b-a)*t;
+  const mix=(c1,c2,t)=>[lerp(c1[0],c2[0],t),lerp(c1[1],c2[1],t),lerp(c1[2],c2[2],t)];
+  const rgb=(c,a)=>a==null?`rgb(${c[0]|0},${c[1]|0},${c[2]|0})`:`rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;
+  const PAL={
+    night:{ sky:[[12,5,8],[36,10,14],[90,28,16],[142,50,20],[184,69,26]],
+            ridge:[[42,20,24],[28,13,16],[19,8,9],[10,4,5]], castle:[12,4,6], massif:[11,5,6],
+            fog:[140,60,50], ember:0.28, purple:0.20 },
+    day:{   sky:[[112,150,205],[150,180,216],[201,216,230],[236,226,201],[246,233,206]],
+            ridge:[[150,165,196],[112,128,162],[78,92,125],[52,64,92]], castle:[132,123,120], massif:[44,55,84],
+            fog:[208,219,235], ember:0, purple:0 }
+  };
+  function palette(){ const n=PAL.night,d=PAL.day,t=dayness; return {
+      sky:n.sky.map((c,i)=>mix(c,d.sky[i],t)),
+      ridge:n.ridge.map((c,i)=>mix(c,d.ridge[i],t)),
+      castle:mix(n.castle,d.castle,t), massif:mix(n.massif,d.massif,t),
+      fog:mix(n.fog,d.fog,t), ember:lerp(n.ember,d.ember,t), purple:lerp(n.purple,d.purple,t) }; }
+  function drawCelestial(){
+    const x=W*0.26, R=Math.min(W,H)*0.055, TAU=Math.PI*2;
+    const sunY = lerp(horizon+R*1.8, horizon*0.32, dayness);   // rises as day breaks
+    const moonY= lerp(horizon*0.30, horizon+R*1.8, dayness);   // sets as day breaks
+    if(dayness>0.02){
+      const sg=ctx.createRadialGradient(x,sunY,0,x,sunY,R*4.2);
+      sg.addColorStop(0,`rgba(255,224,150,${0.55*dayness})`); sg.addColorStop(1,'rgba(255,224,150,0)');
+      ctx.fillStyle=sg; ctx.beginPath(); ctx.arc(x,sunY,R*4.2,0,TAU); ctx.fill();
+      ctx.fillStyle=`rgba(255,244,205,${dayness})`;
+      ctx.beginPath(); ctx.arc(x,sunY,R,0,TAU); ctx.fill();
+    }
+    if(dayness<0.98){
+      const m=1-dayness;
+      const mg=ctx.createRadialGradient(x,moonY,0,x,moonY,R*3);
+      mg.addColorStop(0,`rgba(220,226,255,${0.30*m})`); mg.addColorStop(1,'rgba(220,226,255,0)');
+      ctx.fillStyle=mg; ctx.beginPath(); ctx.arc(x,moonY,R*3,0,TAU); ctx.fill();
+      ctx.fillStyle=`rgba(232,230,246,${m})`;
+      ctx.beginPath(); ctx.arc(x,moonY,R,0,TAU); ctx.fill();
+      ctx.fillStyle=`rgba(178,180,205,${0.55*m})`;   // craters
+      ctx.beginPath(); ctx.arc(x-R*0.32,moonY-R*0.18,R*0.22,0,TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+R*0.26,moonY+R*0.30,R*0.15,0,TAU); ctx.fill();
+      ctx.beginPath(); ctx.arc(x+R*0.08,moonY-R*0.34,R*0.10,0,TAU); ctx.fill();
+    }
+  }
+  const modeBtn=document.getElementById('modeBtn');
+  const MOON='<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+  const SUN='<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1.5" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22.5" y2="12"/><line x1="4.6" y1="4.6" x2="6.4" y2="6.4"/><line x1="17.6" y1="17.6" x2="19.4" y2="19.4"/><line x1="4.6" y1="19.4" x2="6.4" y2="17.6"/><line x1="17.6" y1="6.4" x2="19.4" y2="4.6"/></g></svg>';
+  function setModeIcon(){ if(modeBtn) modeBtn.innerHTML = dayTarget>0.5 ? SUN : MOON; }
+  if(modeBtn){ modeBtn.addEventListener('click', e=>{ e.stopPropagation();
+    dayTarget = dayTarget>0.5 ? 0 : 1;
+    document.body.classList.toggle('day', dayTarget>0.5);
+    setModeIcon();
+  }); }
+  setModeIcon();
+
   function resize(){
     DPR = Math.min(2, window.devicePixelRatio||1);
     W = window.innerWidth; H = window.innerHeight;
@@ -203,7 +285,7 @@
   // ---- big gothic castle ----
   function tower(cx, baseY, w, h, type, windows){
     // body
-    ctx.fillStyle='#0c0406';
+    ctx.fillStyle=rgb(CUR.castle);
     ctx.fillRect(cx-w/2, baseY-h, w, h);
     if(type==='spire'){
       ctx.beginPath();
@@ -221,12 +303,14 @@
     const topY=baseY - h*0.78, span = windows>1 ? h*0.46 : 0;
     for(let i=0;i<windows;i++){
       const wy = windows>1 ? topY + span*(i/(windows-1)) : baseY - h*0.5;
-      const fl = 0.55 + Math.sin(t*2.4 + i*1.9 + cx*0.05)*0.2;
-      // soft glow
-      ctx.fillStyle='rgba(255,135,55,0.10)';
-      ctx.fillRect(cx-s, wy-s*0.5, s*2, s*2);
-      // window
-      ctx.fillStyle=`rgba(255,165,80,${fl})`;
+      const fl = 0.55 + Math.sin(t*2.4 + i*1.9 + cx*0.05)*0.2;   // night flicker
+      // warm glow halo — night only
+      const glowA = 0.10*(1-dayness);
+      if(glowA>0.003){ ctx.fillStyle=`rgba(255,135,55,${glowA})`; ctx.fillRect(cx-s, wy-s*0.5, s*2, s*2); }
+      // window: warm-lit by night, dark recessed opening by day
+      const winCol = mix([255,165,80],[58,52,62],dayness);
+      const winA = lerp(fl, 0.92, dayness);
+      ctx.fillStyle=rgb(winCol, winA);
       ctx.fillRect(cx-s/2, wy, s, s);
     }
   }
@@ -236,7 +320,7 @@
     const pL = cx - fw, pR = cx + fw, bot = H+20;
     const ss = t => { t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); }; // smoothstep
     // smooth mountain that eases flat into the plateau, then smooth down the right
-    ctx.fillStyle='#0b0506';
+    ctx.fillStyle=rgb(CUR.massif);
     ctx.beginPath();
     ctx.moveTo(xL, bot);
     for(let x=xL; x<=xR; x+=4){
@@ -251,7 +335,7 @@
     // ---- symmetric, cohesive castle silhouette ----
     const b=y0+2;
     // curtain wall connecting the whole castle
-    ctx.fillStyle='#0c0406';
+    ctx.fillStyle=rgb(CUR.castle);
     ctx.fillRect(cx - W*0.140, b - H*0.10, W*0.280, H*0.10);
     // towers stepping up symmetrically to the central keep (each overlaps its neighbor)
     tower(cx - W*0.115, b, W*0.050, H*0.15, 'spire',  2); // outer spires
@@ -272,7 +356,8 @@
       c.x += c.sp*0.016;
       const cxp=(((c.x%1)+1)%1)*W, cy=c.y*horizon, r=c.r*W;
       const g=ctx.createRadialGradient(cxp,cy,0,cxp,cy,r);
-      const col = c.purp ? '120,70,150' : '150,70,55';
+      const colN = c.purp ? [120,70,150] : [150,70,55];
+      const col = mix(colN,[238,240,248],dayness).map(v=>v|0).join(',');
       g.addColorStop(0,`rgba(${col},${c.a})`);
       g.addColorStop(1,`rgba(${col},0)`);
       ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cxp,cy,r,0,Math.PI*2); ctx.fill();
@@ -328,44 +413,53 @@
     const dt=Math.min(0.05,(now-last)/1000); last=now; const t=now/1000;
     const par=(mouse.x-0.5);
 
-    // evil sky
-    const g=ctx.createLinearGradient(0,0,0,horizon+H*0.1);
-    g.addColorStop(0,'#0c0508'); g.addColorStop(0.4,'#240a0e');
-    g.addColorStop(0.72,'#5a1c10'); g.addColorStop(0.9,'#8e3214');
-    g.addColorStop(1,'#b8451a');
-    ctx.fillStyle=g; ctx.fillRect(0,0,W,horizon+H*0.1);
-    // ember bloom (low center)
-    const eb=ctx.createRadialGradient(W*0.42,horizon*0.96,0,W*0.42,horizon*0.96,W*0.55);
-    eb.addColorStop(0,'rgba(230,90,30,0.28)'); eb.addColorStop(1,'rgba(230,90,30,0)');
-    ctx.fillStyle=eb; ctx.fillRect(0,0,W,horizon+H*0.1);
-    // purple bloom (upper left)
-    const pb=ctx.createRadialGradient(W*0.22,horizon*0.4,0,W*0.22,horizon*0.4,W*0.4);
-    pb.addColorStop(0,'rgba(120,60,170,0.20)'); pb.addColorStop(1,'rgba(120,60,170,0)');
-    ctx.fillStyle=pb; ctx.fillRect(0,0,W,horizon);
+    // ease day/night, resolve the interpolated palette for this frame
+    dayness += (dayTarget - dayness) * Math.min(1, dt*2.0);
+    if(Math.abs(dayTarget-dayness)<0.001) dayness=dayTarget;
+    const P = palette(); CUR = P;
 
+    // sky
+    const g=ctx.createLinearGradient(0,0,0,horizon+H*0.1);
+    g.addColorStop(0,rgb(P.sky[0])); g.addColorStop(0.4,rgb(P.sky[1]));
+    g.addColorStop(0.72,rgb(P.sky[2])); g.addColorStop(0.9,rgb(P.sky[3]));
+    g.addColorStop(1,rgb(P.sky[4]));
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,horizon+H*0.1);
+    // ember bloom (fades out by day)
+    if(P.ember>0.002){
+      const eb=ctx.createRadialGradient(W*0.42,horizon*0.96,0,W*0.42,horizon*0.96,W*0.55);
+      eb.addColorStop(0,`rgba(230,90,30,${P.ember})`); eb.addColorStop(1,'rgba(230,90,30,0)');
+      ctx.fillStyle=eb; ctx.fillRect(0,0,W,horizon+H*0.1);
+    }
+    // purple bloom (fades out by day)
+    if(P.purple>0.002){
+      const pb=ctx.createRadialGradient(W*0.22,horizon*0.4,0,W*0.22,horizon*0.4,W*0.4);
+      pb.addColorStop(0,`rgba(120,60,170,${P.purple})`); pb.addColorStop(1,'rgba(120,60,170,0)');
+      ctx.fillStyle=pb; ctx.fillRect(0,0,W,horizon);
+    }
+
+    drawCelestial();   // sun/moon rise & set behind the ridges
     drawClouds();
     drawBirds(t);
     drawBolt();
     if(flash>0){ ctx.fillStyle=`rgba(255,190,140,${flash*0.32})`; ctx.fillRect(0,0,W,horizon+H*0.1); }
 
     // mountains (back -> front) — kept below the castle plateau so nothing out-tops it
-    drawRidge(horizon*1.00, H*0.06, 4.2, 0.4, '#2a1418', par*8);
-    drawRidge(horizon*1.10, H*0.08, 3.2, 1.1, '#1c0d10', par*16);
-    drawRidge(horizon*1.20, H*0.09, 3.0, 0.8, '#130809', par*24);
-    drawRidge(horizon*1.33, H*0.10, 2.4, 2.2, '#0a0405', par*34);
+    drawRidge(horizon*1.00, H*0.06, 4.2, 0.4, rgb(P.ridge[0]), par*8);
+    drawRidge(horizon*1.10, H*0.08, 3.2, 1.1, rgb(P.ridge[1]), par*16);
+    drawRidge(horizon*1.20, H*0.09, 3.0, 0.8, rgb(P.ridge[2]), par*24);
+    drawRidge(horizon*1.33, H*0.10, 2.4, 2.2, rgb(P.ridge[3]), par*34);
     // castle on its plateau (front-most), drawn after the ridges
     drawCastle(par*30);
 
     // fog
     const fgm=ctx.createLinearGradient(0,horizon-30,0,horizon+60);
-    fgm.addColorStop(0,'rgba(140,60,50,0)'); fgm.addColorStop(0.5,'rgba(140,60,50,0.10)');
-    fgm.addColorStop(1,'rgba(140,60,50,0)');
+    fgm.addColorStop(0,rgb(P.fog,0)); fgm.addColorStop(0.5,rgb(P.fog,0.10)); fgm.addColorStop(1,rgb(P.fog,0));
     ctx.fillStyle=fgm; ctx.fillRect(0,horizon-30,W,90);
 
     if(boltLife>0){ boltLife-=dt*2.2; if(boltLife<=0){bolt=null;} }
     if(flash>0){ flash-=dt*2.6; }
     nextStrike-=dt;
-    if(nextStrike<=0 && !reduce){ strike(); nextStrike=2.6+Math.random()*4.5; }
+    if(nextStrike<=0 && !reduce && dayness<0.45){ strike(); nextStrike=2.6+Math.random()*4.5; }  // storm only at night
 
     requestAnimationFrame(frame);
   }
