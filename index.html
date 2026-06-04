@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>robbie</title>
+<meta name="description" content="rob — the keep." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#f1e3d8;
+    --ink-dim:#b08a7e;
+    --glow:#ff8a4a;
+    --purple:#9a5ad6;
+    --panel:rgba(28,10,12,0.62);
+    --line:rgba(190,90,60,0.28);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:#0a0406;
+    color:var(--ink);
+    font-family:"Silkscreen",monospace;
+    overflow-x:hidden;
+  }
+
+  #scene{position:fixed;inset:0;width:100vw;height:100vh;z-index:0;display:block;}
+
+  .grain{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0.06;mix-blend-mode:overlay;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+  .vignette{position:fixed;inset:0;z-index:2;pointer-events:none;
+    background:radial-gradient(120% 90% at 50% 35%,transparent 48%,rgba(4,1,3,0.78) 100%);}
+  .scan{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0.04;
+    background:repeating-linear-gradient(0deg,#fff 0 1px,transparent 1px 3px);}
+
+  .content{position:relative;z-index:3;}
+
+  /* ---- HERO ---- */
+  .hero{height:100vh;display:flex;flex-direction:column;justify-content:flex-end;
+    padding:clamp(28px,6vw,70px);}
+  .hero .kicker{font-size:11px;letter-spacing:0.28em;color:var(--ink-dim);text-transform:uppercase;
+    margin-bottom:18px;text-shadow:0 2px 12px rgba(0,0,0,0.85);}
+  .hero h1{font-family:"Pixelify Sans",sans-serif;font-weight:700;
+    font-size:clamp(72px,18vw,180px);line-height:0.82;letter-spacing:-0.01em;
+    color:var(--ink);text-shadow:0 0 28px rgba(230,90,40,0.5),0 6px 0 rgba(0,0,0,0.4);}
+  .hero h1 .spark{color:var(--glow);}
+  .hero .sub{font-family:"Pixelify Sans",sans-serif;font-size:clamp(15px,2.6vw,22px);
+    color:var(--ink-dim);margin-top:22px;max-width:34ch;line-height:1.5;
+    text-shadow:0 2px 10px rgba(0,0,0,0.9);}
+  .hint{margin-top:34px;display:flex;gap:22px;flex-wrap:wrap;font-size:11px;
+    letter-spacing:0.12em;color:var(--ink-dim);text-transform:uppercase;}
+  .hint span{display:inline-flex;align-items:center;gap:7px;}
+  .hint .blink{animation:blink 1.4s steps(2) infinite;}
+  @keyframes blink{50%{opacity:0.25;}}
+
+  /* ---- HALLS ---- */
+  .halls{position:relative;padding:clamp(60px,10vw,130px) clamp(22px,6vw,70px) 120px;
+    background:linear-gradient(180deg,transparent,rgba(8,3,5,0.6)18%,rgba(8,3,5,0.85) 100%);}
+  .halls .eyebrow{font-size:12px;letter-spacing:0.24em;text-transform:uppercase;color:var(--glow);
+    display:flex;align-items:center;gap:14px;margin-bottom:10px;}
+  .halls .eyebrow::after{content:"";flex:1;height:1px;background:var(--line);}
+  .halls .lede{font-family:"Pixelify Sans",sans-serif;font-size:clamp(20px,4vw,32px);
+    color:var(--ink);max-width:26ch;line-height:1.25;margin-bottom:48px;}
+
+  .cards{display:grid;gap:18px;max-width:1000px;}
+  @media(min-width:760px){.cards{grid-template-columns:repeat(3,1fr);}}
+  .card{position:relative;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:26px 22px;backdrop-filter:blur(6px);
+    transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;}
+  .card:hover{transform:translateY(-5px);border-color:rgba(255,130,70,0.6);
+    box-shadow:0 22px 55px -24px rgba(220,80,30,0.65);}
+  a.card{text-decoration:none;color:inherit;display:block;}
+  .card .no{font-family:"Pixelify Sans",sans-serif;font-size:12px;letter-spacing:0.04em;
+    color:var(--glow);text-transform:uppercase;}
+  .card h3{font-family:"Pixelify Sans",sans-serif;font-weight:700;font-size:26px;
+    margin:6px 0 12px;color:var(--ink);}
+  .card p{font-family:"Pixelify Sans",sans-serif;font-size:15px;color:var(--ink-dim);line-height:1.55;}
+  .tag{display:inline-block;margin-top:16px;font-size:10px;letter-spacing:0.16em;
+    text-transform:uppercase;padding:5px 10px;border-radius:999px;
+    color:var(--ink-dim);background:rgba(190,90,60,0.1);border:1px solid var(--line);}
+
+  footer{position:relative;z-index:3;padding:30px clamp(22px,6vw,70px);
+    border-top:1px solid var(--line);font-size:10px;letter-spacing:0.08em;
+    color:var(--ink-dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
+    background:rgba(8,3,5,0.85);text-transform:uppercase;}
+</style>
+</head>
+<body>
+  <canvas id="scene" aria-hidden="true"></canvas>
+  <div class="grain"></div>
+  <div class="scan"></div>
+  <div class="vignette"></div>
+
+  <div class="content">
+    <section class="hero">
+      <div class="kicker" id="kicker"></div>
+      <h1 id="name"></h1>
+      <p class="sub" id="tagline"></p>
+      <div class="hint"><span class="blink" id="scrollHint"></span></div>
+    </section>
+
+    <section class="halls">
+      <div class="eyebrow" id="hallsEyebrow"></div>
+      <p class="lede" id="hallsLede"></p>
+      <div class="cards" id="cards"></div>
+    </section>
+
+    <footer>
+      <span id="footerLeft"></span>
+      <span id="footerRight"></span>
+    </footer>
+  </div>
+
+<script>
+(function(){
+  /* ============================================================
+     EDIT YOUR TEXT HERE.
+     Every word on the site lives in this one block. Change the
+     strings, add or remove cards, and you're done — you don't need
+     to touch anything below it.
+     ============================================================ */
+  const CONTENT = {
+    name:        "robbie",          // the big title ( a "." is added for you )
+    kicker:      "// lorem ipsum",  // the small line above the title
+    tagline:     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt.",
+    scrollHint:  "lorem ipsum",     // the blinking line at the bottom of the first screen ( a ↓ is added )
+
+    hallsEyebrow:"lorem ipsum",     // small heading above the three cards
+    hallsLede:   "Lorem ipsum dolor sit amet, consectetur adipiscing.",
+
+    // each card: label (small), title (big), body, tag, and an optional link.
+    // leave href as "" for no link; add a URL later to make the card clickable.
+    cards: [
+      { label:"lorem ipsum", title:"Lorem Ipsum", body:"Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.", tag:"coming soon", href:"" },
+      { label:"dolor sit",   title:"Dolor Sit",   body:"Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo.",     tag:"coming soon", href:"" },
+      { label:"amet elit",   title:"Amet Elit",   body:"Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.", tag:"coming soon", href:"" },
+    ],
+
+    footerLeft:  "lorem ipsum",     // the current year is added in front automatically
+    footerRight: "dolor sit amet",
+  };
+
+  /* ---- inject the text above into the page (no need to edit below) ---- */
+  const set = (id, txt) => { const el=document.getElementById(id); if(el) el.textContent=txt; };
+  document.getElementById('name').innerHTML = CONTENT.name + '<span class="spark">.</span>';
+  set('kicker', CONTENT.kicker);
+  set('tagline', CONTENT.tagline);
+  set('scrollHint', '↓ ' + CONTENT.scrollHint);
+  set('hallsEyebrow', CONTENT.hallsEyebrow);
+  set('hallsLede', CONTENT.hallsLede);
+  set('footerLeft', '© ' + new Date().getFullYear() + '  ' + CONTENT.footerLeft);
+  set('footerRight', CONTENT.footerRight);
+  document.getElementById('cards').innerHTML = CONTENT.cards.map(c => {
+    const inner = `<div class="no">${c.label}</div><h3>${c.title}</h3><p>${c.body}</p><span class="tag">${c.tag}</span>`;
+    return c.href ? `<a class="card" href="${c.href}">${inner}</a>` : `<article class="card">${inner}</article>`;
+  }).join('');
+
+  const cv = document.getElementById('scene');
+  const ctx = cv.getContext('2d');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W, H, DPR, horizon;
+  let mouse = {x:0.5, y:0.5};
+
+  function resize(){
+    DPR = Math.min(2, window.devicePixelRatio||1);
+    W = window.innerWidth; H = window.innerHeight;
+    cv.width = W*DPR; cv.height = H*DPR;
+    cv.style.width=W+'px'; cv.style.height=H+'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    horizon = H*0.60;
+  }
+  window.addEventListener('resize', resize); resize();
+
+  function ridgeY(x, base, amp, f, ph){
+    const u = x/W;
+    return base
+      - amp*( Math.sin(u*Math.PI*f + ph)*0.6
+            + Math.sin(u*Math.PI*f*2.3 + ph*1.7)*0.28
+            + Math.sin(u*Math.PI*f*5.1 + ph*0.5)*0.12 );
+  }
+  function drawRidge(base, amp, f, ph, color, px){
+    ctx.beginPath();
+    ctx.moveTo(-20, H+20);
+    for(let x=-20; x<=W+20; x+=6){ ctx.lineTo(x+px, ridgeY(x, base, amp, f, ph)); }
+    ctx.lineTo(W+20, H+20); ctx.closePath();
+    ctx.fillStyle = color; ctx.fill();
+  }
+
+  // ---- big gothic castle ----
+  function tower(cx, baseY, w, h, type, windows){
+    // body
+    ctx.fillStyle='#0c0406';
+    ctx.fillRect(cx-w/2, baseY-h, w, h);
+    if(type==='spire'){
+      ctx.beginPath();
+      ctx.moveTo(cx-w/2, baseY-h);
+      ctx.lineTo(cx, baseY-h-w*1.5);
+      ctx.lineTo(cx+w/2, baseY-h);
+      ctx.closePath(); ctx.fill();
+    } else { // crenellations
+      const m=w/7;
+      for(let i=0;i<7;i+=2){ ctx.fillRect(cx-w/2+i*m, baseY-h-m*1.1, m, m*1.1); }
+    }
+    // lit windows — small squares, evenly spaced in a tidy column
+    const t=performance.now()/1000;
+    const s=Math.max(3, Math.min(6, w*0.16));   // consistent small square
+    const topY=baseY - h*0.78, span = windows>1 ? h*0.46 : 0;
+    for(let i=0;i<windows;i++){
+      const wy = windows>1 ? topY + span*(i/(windows-1)) : baseY - h*0.5;
+      const fl = 0.55 + Math.sin(t*2.4 + i*1.9 + cx*0.05)*0.2;
+      // soft glow
+      ctx.fillStyle='rgba(255,135,55,0.10)';
+      ctx.fillRect(cx-s, wy-s*0.5, s*2, s*2);
+      // window
+      ctx.fillStyle=`rgba(255,165,80,${fl})`;
+      ctx.fillRect(cx-s/2, wy, s, s);
+    }
+  }
+  function drawCastle(px){
+    const cx = W*0.80 + px, y0 = H*0.47, fw = W*0.155;
+    const xL = cx - W*0.42, xR = cx + W*0.32;   // feet of the mountain (right runs to the edge)
+    const pL = cx - fw, pR = cx + fw, bot = H+20;
+    const ss = t => { t=Math.max(0,Math.min(1,t)); return t*t*(3-2*t); }; // smoothstep
+    // smooth mountain that eases flat into the plateau, then smooth down the right
+    ctx.fillStyle='#0b0506';
+    ctx.beginPath();
+    ctx.moveTo(xL, bot);
+    for(let x=xL; x<=xR; x+=4){
+      let y;
+      if(x < pL)      y = bot + (y0-bot)*ss((x-xL)/(pL-xL));   // smooth rise
+      else if(x > pR) y = y0  + (bot-y0)*ss((x-pR)/(xR-pR));   // smooth fall
+      else            y = y0;                                  // flat plateau
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(xR, bot);
+    ctx.closePath(); ctx.fill();
+    // ---- symmetric, cohesive castle silhouette ----
+    const b=y0+2;
+    // curtain wall connecting the whole castle
+    ctx.fillStyle='#0c0406';
+    ctx.fillRect(cx - W*0.140, b - H*0.10, W*0.280, H*0.10);
+    // towers stepping up symmetrically to the central keep (each overlaps its neighbor)
+    tower(cx - W*0.115, b, W*0.050, H*0.15, 'spire',  2); // outer spires
+    tower(cx + W*0.115, b, W*0.050, H*0.15, 'spire',  2);
+    tower(cx - W*0.060, b, W*0.064, H*0.20, 'crenel', 2); // inner battlemented towers
+    tower(cx + W*0.060, b, W*0.064, H*0.20, 'crenel', 2);
+    tower(cx,           b, W*0.078, H*0.30, 'spire',  3); // central keep
+  }
+
+  // ---- clouds ----
+  const clouds = Array.from({length:6},(_, i)=>({
+    x:Math.random(), y:0.08+Math.random()*0.42, r:0.18+Math.random()*0.22,
+    sp:(0.004+Math.random()*0.006)*(i%2?1:-1), a:0.10+Math.random()*0.12,
+    purp:i%3===0
+  }));
+  function drawClouds(){
+    clouds.forEach(c=>{
+      c.x += c.sp*0.016;
+      const cxp=(((c.x%1)+1)%1)*W, cy=c.y*horizon, r=c.r*W;
+      const g=ctx.createRadialGradient(cxp,cy,0,cxp,cy,r);
+      const col = c.purp ? '120,70,150' : '150,70,55';
+      g.addColorStop(0,`rgba(${col},${c.a})`);
+      g.addColorStop(1,`rgba(${col},0)`);
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(cxp,cy,r,0,Math.PI*2); ctx.fill();
+    });
+  }
+
+  // ---- crows (4) ----
+  const birds = Array.from({length:4},(_, i)=>({
+    x:Math.random()*1.3, y:0.09+Math.random()*0.24,
+    sp:0.00011+Math.random()*0.00017, size:6+Math.random()*5,
+    ph:Math.random()*6, flap:5+Math.random()*4
+  }));
+  function drawBirds(t){
+    ctx.strokeStyle='rgba(14,6,8,0.92)'; ctx.lineWidth=2;
+    birds.forEach(b=>{
+      b.x += b.sp;
+      const bx=(((b.x%1.3)+1.3)%1.3)*W - W*0.15, by=b.y*H, fl=Math.sin(t*b.flap+b.ph)*(b.size*0.6);
+      ctx.beginPath();
+      ctx.moveTo(bx-b.size, by+fl); ctx.lineTo(bx, by); ctx.lineTo(bx+b.size, by+fl); ctx.stroke();
+    });
+  }
+
+  // ---- lightning (auto only) ----
+  let bolt=null, boltLife=0, flash=0, nextStrike=1.2;
+  function makeBolt(x1,y1,x2,y2,d,arr){
+    if(d<5){ arr.push([x1,y1,x2,y2]); return; }
+    const mx=(x1+x2)/2+(Math.random()-0.5)*d;
+    const my=(y1+y2)/2+(Math.random()-0.5)*d*0.6;
+    makeBolt(x1,y1,mx,my,d/2,arr);
+    makeBolt(mx,my,x2,y2,d/2,arr);
+    if(Math.random()<0.45){ makeBolt(mx,my, mx+(Math.random()-0.3)*d, my+d*0.9, d/2, arr); }
+  }
+  function strike(){
+    const x0 = W*(0.12+Math.random()*0.55);
+    const arr=[]; makeBolt(x0, -10, x0+(Math.random()-0.5)*W*0.25, horizon*0.92, W*0.22, arr);
+    bolt=arr; boltLife=1; flash=1;
+  }
+  function drawBolt(){
+    if(!bolt) return;
+    ctx.save();
+    ctx.strokeStyle=`rgba(255,242,232,${Math.max(0,boltLife)})`;
+    ctx.shadowColor='rgba(255,120,60,0.9)'; ctx.shadowBlur=16;
+    ctx.lineWidth=2.2; ctx.lineCap='round';
+    ctx.beginPath();
+    bolt.forEach(s=>{ ctx.moveTo(s[0],s[1]); ctx.lineTo(s[2],s[3]); });
+    ctx.stroke(); ctx.restore();
+  }
+
+  window.addEventListener('mousemove', e=>{ mouse.x=e.clientX/W; mouse.y=e.clientY/H; });
+
+  let last=performance.now();
+  function frame(now){
+    const dt=Math.min(0.05,(now-last)/1000); last=now; const t=now/1000;
+    const par=(mouse.x-0.5);
+
+    // evil sky
+    const g=ctx.createLinearGradient(0,0,0,horizon+H*0.1);
+    g.addColorStop(0,'#0c0508'); g.addColorStop(0.4,'#240a0e');
+    g.addColorStop(0.72,'#5a1c10'); g.addColorStop(0.9,'#8e3214');
+    g.addColorStop(1,'#b8451a');
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,horizon+H*0.1);
+    // ember bloom (low center)
+    const eb=ctx.createRadialGradient(W*0.42,horizon*0.96,0,W*0.42,horizon*0.96,W*0.55);
+    eb.addColorStop(0,'rgba(230,90,30,0.28)'); eb.addColorStop(1,'rgba(230,90,30,0)');
+    ctx.fillStyle=eb; ctx.fillRect(0,0,W,horizon+H*0.1);
+    // purple bloom (upper left)
+    const pb=ctx.createRadialGradient(W*0.22,horizon*0.4,0,W*0.22,horizon*0.4,W*0.4);
+    pb.addColorStop(0,'rgba(120,60,170,0.20)'); pb.addColorStop(1,'rgba(120,60,170,0)');
+    ctx.fillStyle=pb; ctx.fillRect(0,0,W,horizon);
+
+    drawClouds();
+    drawBirds(t);
+    drawBolt();
+    if(flash>0){ ctx.fillStyle=`rgba(255,190,140,${flash*0.32})`; ctx.fillRect(0,0,W,horizon+H*0.1); }
+
+    // mountains (back -> front) — kept below the castle plateau so nothing out-tops it
+    drawRidge(horizon*1.00, H*0.06, 4.2, 0.4, '#2a1418', par*8);
+    drawRidge(horizon*1.10, H*0.08, 3.2, 1.1, '#1c0d10', par*16);
+    drawRidge(horizon*1.20, H*0.09, 3.0, 0.8, '#130809', par*24);
+    drawRidge(horizon*1.33, H*0.10, 2.4, 2.2, '#0a0405', par*34);
+    // castle on its plateau (front-most), drawn after the ridges
+    drawCastle(par*30);
+
+    // fog
+    const fgm=ctx.createLinearGradient(0,horizon-30,0,horizon+60);
+    fgm.addColorStop(0,'rgba(140,60,50,0)'); fgm.addColorStop(0.5,'rgba(140,60,50,0.10)');
+    fgm.addColorStop(1,'rgba(140,60,50,0)');
+    ctx.fillStyle=fgm; ctx.fillRect(0,horizon-30,W,90);
+
+    if(boltLife>0){ boltLife-=dt*2.2; if(boltLife<=0){bolt=null;} }
+    if(flash>0){ flash-=dt*2.6; }
+    nextStrike-=dt;
+    if(nextStrike<=0 && !reduce){ strike(); nextStrike=2.6+Math.random()*4.5; }
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
