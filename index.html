@@ -85,6 +85,15 @@
     border-top:1px solid var(--line);font-size:10px;letter-spacing:0.08em;
     color:var(--ink-dim);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;
     background:rgba(8,3,5,0.85);text-transform:uppercase;}
+  /* ---- music toggle (top right) ---- */
+  .player-btn{position:fixed;top:18px;right:18px;z-index:6;
+    width:44px;height:44px;border-radius:50%;
+    background:rgba(20,8,10,0.55);border:1px solid var(--line);
+    -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+    color:var(--glow);transition:border-color .2s,transform .2s;}
+  .player-btn:hover{border-color:rgba(255,130,70,0.7);transform:scale(1.06);}
+  .player-btn svg{width:18px;height:18px;fill:currentColor;display:block;}
 </style>
 </head>
 <body>
@@ -92,6 +101,10 @@
   <div class="grain"></div>
   <div class="scan"></div>
   <div class="vignette"></div>
+
+  <button id="playerBtn" class="player-btn" aria-label="Play music"></button>
+  <!-- EDIT: replace song.mp3 with your own audio file in the repo (see note) -->
+  <audio id="song" src="song.mp3" loop preload="auto"></audio>
 
   <div class="content">
     <section class="hero">
@@ -122,7 +135,7 @@
      to touch anything below it.
      ============================================================ */
   const CONTENT = {
-    name:        "robbie",          // the big title ( a "." is added for you )
+    name:        "robbie",          // the big title
     kicker:      "// hello",  // the small line above the title
     tagline:     "product marketing manager based in los angeles. currently working at 1stdibs and building some other cool stuff. ",
     scrollHint:  "my stuff",     // the blinking line at the bottom of the first screen ( a ↓ is added )
@@ -143,14 +156,14 @@
 
   /* ---- inject the text above into the page (no need to edit below) ---- */
   const set = (id, txt) => { const el=document.getElementById(id); if(el) el.textContent=txt; };
-  document.getElementById('name').innerHTML = CONTENT.name + '<span class="spark">.</span>';
+  document.getElementById('name').innerHTML = CONTENT.name;
   set('kicker', CONTENT.kicker);
   set('tagline', CONTENT.tagline);
   set('scrollHint', '↓ ' + CONTENT.scrollHint);
   set('hallsEyebrow', CONTENT.hallsEyebrow);
   set('hallsLede', CONTENT.hallsLede);
   set('footerLeft', '© ' + new Date().getFullYear() + '  ' + CONTENT.footerLeft);
-  set('footerRight', CONTENT.footerRight);
+  set('footerRight', CONTENT.footerRight || '');
   document.getElementById('cards').innerHTML = CONTENT.cards.map(c => {
     const inner = `<div class="no">${c.label}</div><h3>${c.title}</h3><p>${c.body}</p><span class="tag">${c.tag}</span>`;
     return c.href ? `<a class="card" href="${c.href}">${inner}</a>` : `<article class="card">${inner}</article>`;
@@ -357,6 +370,40 @@
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  // ---- music: arm on load, kick in on first interaction, toggle top-right ----
+  (function(){
+    const audio = document.getElementById('song');
+    const btn = document.getElementById('playerBtn');
+    if(!audio || !btn) return;
+    const PLAY  = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+    const PAUSE = '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+    audio.volume = 0.45;
+    let userPaused = false;
+    const setIcon = playing => {
+      btn.innerHTML = playing ? PAUSE : PLAY;
+      btn.setAttribute('aria-label', playing ? 'Pause music' : 'Play music');
+    };
+    const tryPlay = () => audio.play().then(()=>setIcon(true)).catch(()=>setIcon(false));
+
+    setIcon(false);
+    tryPlay(); // many browsers block this until interaction — that's why we also do the below
+
+    function startOnce(){
+      if(audio.paused && !userPaused) tryPlay();
+      ['pointerdown','keydown','scroll','touchstart'].forEach(ev=>window.removeEventListener(ev, startOnce));
+    }
+    ['pointerdown','keydown','scroll','touchstart'].forEach(ev=>
+      window.addEventListener(ev, startOnce, {passive:true}));
+
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      if(audio.paused){ userPaused=false; tryPlay(); }
+      else { userPaused=true; audio.pause(); setIcon(false); }
+    });
+    audio.addEventListener('play',  ()=>setIcon(true));
+    audio.addEventListener('pause', ()=>setIcon(false));
+  })();
 })();
 </script>
 </body>
