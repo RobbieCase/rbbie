@@ -108,7 +108,7 @@
   <div class="head">
     <div class="kicker">// the composer</div>
     <h1>write an article</h1>
-    <p class="note"><b>Private tool — password-locked.</b> You can keep this file on your computer, or put it on your site (e.g. <b>rbbie.com/composer.html</b>) and reach it with the password. Default password is <b>changeme</b> — change it in the script (instructions are right above the password line). Write a post, and it hands you two things to paste into GitHub. Nothing publishes until you commit, and only you can do that.</p>
+    <p class="note"><b>Private tool — password-locked.</b> You can keep this file on your computer, or put it on your site (e.g. <b>rbbie.com/composer.html</b>) and reach it with the password. Write a post, and it hands you two things to paste into GitHub. Nothing publishes until you commit, and only you can do that.</p>
   </div>
 
   <div class="grid">
@@ -184,17 +184,12 @@
   const now=new Date();
   $('date').value = months[now.getMonth()] + ' ' + now.getFullYear();
 
-  /* ---- password gate (soft lock) ----
-     Default password is:  changeme
-     To change it: open this page on your https link, open the browser console, run
-        hashPw('your-new-password').then(h => console.log(h))
-     then paste the printed value in place of PASSWORD_HASH below. */
-  const PASSWORD_HASH = '057ba03d6c44104863dc7361fe4578965d1887360f90a0895882e58a6248fc86';
+  /* password gate (soft lock) */
+  const PASSWORD_HASH = 'e63a4d4937cf7f657f404f76e92d9b0412f4f3255d745260de0a01b6eae882a6';
   async function sha256hex(str){
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
     return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
   }
-  window.hashPw = sha256hex;
   async function tryUnlock(){
     const err=$('gateErr');
     if(!window.crypto || !crypto.subtle){
