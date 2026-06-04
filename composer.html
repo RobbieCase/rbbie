@@ -152,7 +152,7 @@
   <div class="grid" style="margin-top:22px;">
     <div class="card out">
       <h2>2 · the article file</h2>
-      <div class="hint">Save this as <code id="fname">my-first-post.html</code> in your repo (same folder as index.html).</div>
+      <div class="hint">In GitHub, create this as <code id="fname">posts/my-first-post.html</code> — typing the <code>posts/</code> part puts it in the posts folder for you.</div>
       <div class="btns">
         <button id="copyFile">Copy file</button>
         <button id="dlFile" class="ghost">Download .html</button>
@@ -288,7 +288,7 @@
   <div class="grain"></div>
   <div class="vignette"></div>
   <div class="wrap">
-    <a class="back" href="abyss.html">&larr; back to the abyss</a>
+    <a class="back" href="../abyss.html">&larr; back to the abyss</a>
     <article class="post">
       <div class="date">${escHtml(date)}</div>
       <h1 class="post-title">${escHtml(title)}</h1>
@@ -321,7 +321,7 @@
     $('fileOut').value = buildFile(title, date, bodyHtml);
     $('entryOut').value =
       `    { title:"${escJs(title)}", date:"${escJs(date)}", summary:"${escJs(summary)}", slug:"${escJs(slug)}" },`;
-    $('fname').textContent = slug + '.html';
+    $('fname').textContent = 'posts/' + slug + '.html';
   }
 
   ['title','date','summary','body'].forEach(id=>$(id).addEventListener('input', render));

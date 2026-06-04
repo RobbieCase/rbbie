@@ -88,7 +88,7 @@
   const list = document.getElementById('list');
   list.innerHTML = ARTICLES.length
     ? ARTICLES.map(a => `
-        <a class="entry" href="${a.slug}.html">
+        <a class="entry" href="posts/${a.slug}.html">
           <div class="date">${a.date}</div>
           <h2>${a.title}</h2>
           <div class="summary">${a.summary}</div>
