@@ -4,6 +4,8 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>robbie</title>
+<link rel="icon" type="image/png" href="favicon.png" />
+<link rel="apple-touch-icon" href="favicon.png" />
 <meta name="description" content="robbie — personal site." />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -451,11 +453,6 @@
     drawRidge(horizon*1.33, H*0.10, 2.4, 2.2, rgb(P.ridge[3]), par*34);
     // castle on its plateau (front-most), drawn after the ridges
     drawCastle(par*30);
-
-    // fog
-    const fgm=ctx.createLinearGradient(0,horizon-30,0,horizon+60);
-    fgm.addColorStop(0,rgb(P.fog,0)); fgm.addColorStop(0.5,rgb(P.fog,0.10)); fgm.addColorStop(1,rgb(P.fog,0));
-    ctx.fillStyle=fgm; ctx.fillRect(0,horizon-30,W,90);
 
     if(boltLife>0){ boltLife-=dt*2.2; if(boltLife<=0){bolt=null;} }
     if(flash>0){ flash-=dt*2.6; }
