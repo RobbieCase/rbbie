@@ -42,6 +42,7 @@
     padding:clamp(28px,6vw,70px);}
   .hero .kicker{font-size:11px;letter-spacing:0.28em;color:var(--ink-dim);text-transform:uppercase;
     margin-bottom:18px;text-shadow:0 2px 12px rgba(0,0,0,0.85);}
+  .hero .kicker:empty{display:none;}
   .hero h1{font-family:"Pixelify Sans",sans-serif;font-weight:700;
     font-size:clamp(72px,18vw,180px);line-height:0.82;letter-spacing:-0.01em;
     color:var(--ink);text-shadow:0 0 28px rgba(230,90,40,0.5),0 6px 0 rgba(0,0,0,0.4);}
@@ -165,14 +166,14 @@
      ============================================================ */
   const CONTENT = {
     name:        "robbie",          // the big title
-    kicker:      "// hello",  // the small line above the title
+    kicker:      "",  // the small line above the title (leave empty to hide)
     tagline:     "product marketing manager based in los angeles. currently working at 1stdibs and building some other cool stuff. ",
     scrollHint:  "my stuff",     // the blinking line at the bottom of the first screen ( a ↓ is added )
 
     hallsEyebrow:"the dungeon",     // small heading above the three cards
     hallsLede:   "my thoughts, dreams, projects, and more.",
 
-    // each card: label (small), title (big), body, tag, and an optional link.
+    // each card: label (small), title (big), body, and an optional link.
     // leave href as "" for no link; add a URL later to make the card clickable.
     cards: [
       { label:"my blog", title:"the abyss", body:"a collection of thoughts, shitposts, commentaries, and other things no one wants to read.", href:"abyss.html" },
@@ -194,7 +195,7 @@
   set('footerLeft', '© ' + new Date().getFullYear() + '  ' + CONTENT.footerLeft);
   set('footerRight', CONTENT.footerRight || '');
   document.getElementById('cards').innerHTML = CONTENT.cards.map(c => {
-    const inner = `<div class="no">${c.label}</div><h3>${c.title}</h3><p>${c.body}</p><span class="tag">${c.tag}</span>`;
+    const inner = `<div class="no">${c.label}</div><h3>${c.title}</h3><p>${c.body}</p>`;
     return c.href ? `<a class="card" href="${c.href}">${inner}</a>` : `<article class="card">${inner}</article>`;
   }).join('');
 
@@ -333,7 +334,7 @@
     ctx.lineTo(xR, bot);
     ctx.closePath(); ctx.fill();
     // ---- symmetric, cohesive castle silhouette ----
-    const b=y0+2;
+    const b=y0;
     // curtain wall connecting the whole castle
     ctx.fillStyle=rgb(CUR.castle);
     ctx.fillRect(cx - W*0.140, b - H*0.10, W*0.280, H*0.10);
