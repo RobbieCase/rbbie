@@ -9,7 +9,12 @@
   :root{ --cream:#f6f1df; --ink:#10160d; --green:#1d4a2a; }
   *{margin:0;padding:0;box-sizing:border-box}
   html,body{height:100%;overflow:hidden;background:#0a1228;font-family:"Avenir Next","Futura",-apple-system,"Helvetica Neue",sans-serif}
-  #scene{position:fixed;inset:0;cursor:grab}
+  #scene{
+    position:fixed;inset:0;cursor:grab;
+    filter:blur(26px);transform:scale(1.05);
+    transition:filter .8s ease, transform .8s ease;
+  }
+  #scene.ready{filter:blur(0);transform:scale(1)}
   #scene.dragging{cursor:grabbing}
   #scene.hover-link{cursor:pointer}
 
@@ -29,21 +34,6 @@
   #modeToggle .icon-moon{position:absolute;opacity:0;transform:rotate(-60deg) scale(.6)}
   body.night #modeToggle .icon-sun{opacity:0;transform:rotate(60deg) scale(.6)}
   body.night #modeToggle .icon-moon{opacity:1;transform:rotate(0) scale(1)}
-
-  #hint{
-    position:fixed;bottom:26px;left:50%;transform:translateX(-50%);
-    color:var(--cream);font-size:12px;letter-spacing:.22em;text-transform:uppercase;
-    opacity:.65;z-index:5;pointer-events:none;transition:opacity 1.2s;
-    text-shadow:0 1px 8px rgba(0,0,0,.35);
-  }
-  #hint.gone{opacity:0}
-
-  #loader{
-    position:fixed;inset:0;z-index:30;display:flex;align-items:center;justify-content:center;
-    background:#86b8e8;color:#fff;font-size:13px;letter-spacing:.3em;text-transform:uppercase;
-    transition:opacity .8s;
-  }
-  #loader.gone{opacity:0;pointer-events:none}
 
   #overlay{
     position:fixed;inset:0;z-index:20;display:none;
@@ -98,14 +88,10 @@
 </head>
 <body>
 <div id="scene"></div>
-<div id="loader">growing the grass…</div>
-
 <button id="modeToggle" aria-label="Switch to night mode">
   <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.4M12 19.1v2.4M2.5 12h2.4M19.1 12h2.4M5 5l1.7 1.7M17.3 17.3 19 19M19 5l-1.7 1.7M6.7 17.3 5 19"/></svg>
   <svg class="icon-moon" viewBox="0 0 24 24"><path d="M20 14.2A8.3 8.3 0 0 1 9.8 4 8.3 8.3 0 1 0 20 14.2Z"/></svg>
 </button>
-
-<div id="hint">drag to look around</div>
 
 <div id="overlay">
   <div class="panel" id="panel-about" hidden>
@@ -230,7 +216,21 @@ placeCamera();
 /* ============================================================
    TEXTURES (embedded)
 ============================================================ */
-const texLoader = new THREE.TextureLoader();
+const T0 = performance.now();
+function unblur(){
+  const elapsed = performance.now() - T0;
+  if (elapsed < 180){
+    /* cached load — nothing to hide, skip the blur entirely */
+    container.style.transition = 'none';
+    container.classList.add('ready');
+    return;
+  }
+  const wait = Math.max(0, 400 - elapsed);   // brief hold, then focus in
+  setTimeout(()=>container.classList.add('ready'), wait);
+}
+const loadManager = new THREE.LoadingManager(unblur);
+setTimeout(unblur, 3000);   // safety net
+const texLoader = new THREE.TextureLoader(loadManager);
 const bladeDiffuse = texLoader.load(TEX_BLADE_DIFFUSE);
 const bladeAlpha = texLoader.load(TEX_BLADE_ALPHA);
 const noiseTex = texLoader.load(TEX_NOISE);
@@ -1088,7 +1088,6 @@ container.addEventListener('pointermove', e=>{
     yaw   += yawV;
     pitch += pitchV;
     lastX=e.clientX; lastY=e.clientY;
-    hideHint();
   } else {
     pointer.x = (e.clientX/innerWidth)*2-1;
     pointer.y = -(e.clientY/innerHeight)*2+1;
@@ -1147,11 +1146,6 @@ toggle.addEventListener('click', ()=>{
   document.body.classList.toggle('night', !!nightTarget);
   toggle.setAttribute('aria-label', nightTarget ? 'Switch to day mode' : 'Switch to night mode');
 });
-
-const hint = document.getElementById('hint');
-let hintHidden=false;
-function hideHint(){ if(!hintHidden){ hintHidden=true; hint.classList.add('gone'); } }
-setTimeout(hideHint, 7000);
 
 addEventListener('resize', ()=>{
   camera.aspect = innerWidth/innerHeight;
@@ -1347,7 +1341,6 @@ function tick(){
   renderer.render(scene, camera);
 }
 tick();
-setTimeout(()=>document.getElementById('loader').classList.add('gone'), 700);
 })();
 </script>
 </body>
