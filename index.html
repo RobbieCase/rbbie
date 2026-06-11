@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>robbie</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🍃</text></svg>">
 <style>
   :root{ --cream:#f6f1df; --ink:#10160d; --green:#1d4a2a; }
   *{margin:0;padding:0;box-sizing:border-box}
@@ -68,6 +69,24 @@
   .panel .proj:last-child{border-bottom:none}
   .panel .proj b{display:block;font-size:15px;color:var(--green);letter-spacing:.04em;margin-bottom:3px}
   .panel .proj span{font-size:14px;line-height:1.5;color:#3a4434}
+  .proj-link{
+    display:inline-block;
+    margin-top:10px;
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:.04em;
+    color:var(--green);
+    text-decoration:none;
+    border-bottom:1px solid rgba(29,74,42,.35);
+    padding-bottom:1px;
+    transition:border-color .2s;
+  }
+  .proj-link .arrow{
+    display:inline-block;
+    transition:transform .2s;
+  }
+  .proj-link:hover{border-color:var(--green)}
+  .proj-link:hover .arrow{transform:translateX(4px)}
   .panel .close{
     position:absolute;top:16px;right:16px;width:32px;height:32px;border-radius:50%;
     border:none;background:rgba(29,74,42,.1);color:var(--green);
@@ -100,8 +119,8 @@
   <div class="panel" id="panel-projects" hidden>
     <button class="close" aria-label="Close">✕</button>
     <h2>Projects</h2>
-    <div class="proj"><b>ResyWatcher</b><span>A bot that watches hard-to-get restaurant reservations and pings the second a table drops. <a href="https://github.com/RobbieCase/ResyWatcher">View here ></a> </span></div>
-    <div class="proj"><b>Provenance</b><span>Provenance</span></div>
+    <div class="proj"><b>ResyWatcher</b><span>A bot that watches hard-to-get restaurant reservations and pings the second a table drops.</span>
+      <a class="proj-link" href="https://github.com/RobbieCase/ResyWatcher" target="_blank" rel="noopener">View on GitHub <span class="arrow">→</span></a></div>
   </div>
 </div>
 
