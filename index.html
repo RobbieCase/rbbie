@@ -95,7 +95,7 @@
   <div class="panel" id="panel-about" hidden>
     <button class="close" aria-label="Close">✕</button>
     <h2>About</h2>
-    <p>My name is Robbie, I’m a 25-year-old Product Marketing Manager based in Los Angeles, CA. I like discovering new music, art & photography, architecture, interior design, digital anthropology, backpacking & hiking, fly fishing, mountains & nature, video games, history, political & economic systems, defense technology, artificial intelligence, ufology, and exploring ideas and subcultures.</p>
+    <p>My name is Robbie, I’m a 25 year old based in Los Angeles, CA currently working in Product Marketing at 1stDibs. I like discovering new music, art & photography, architecture, interior design, digital anthropology, backpacking & hiking, fly fishing, mountains & nature, video games, history, political & economic systems, defense technology, artificial intelligence, ufology, and exploring ideas and subcultures.</p>
   </div>
   <div class="panel" id="panel-projects" hidden>
     <button class="close" aria-label="Close">✕</button>
@@ -193,6 +193,8 @@ renderer.autoClear = false;
 container.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xcfe0ee, 55, 170);
+const FOG_SCN = [new THREE.Color('#cfe0ee'), new THREE.Color('#0b1424')];
 const camera = new THREE.PerspectiveCamera(CFG.fov, innerWidth/innerHeight, 0.5, 1500);
 
 const TARGET = new THREE.Vector3(0, 5, CFG.textZ);
@@ -498,7 +500,7 @@ vec3 getNormal(vec3 pos){
 }
 `;
 {
-  const GW = CFG.width * 1.5, GR = 14;
+  const GW = CFG.width * 2.6, GR = 22;
   const base = new THREE.PlaneGeometry(GW, GW, GR, GR);
   base.lookAt(new THREE.Vector3(0,1,0));
   const geo = new THREE.PlaneGeometry(GW, GW, GR, GR);
@@ -754,6 +756,439 @@ void main(){
 }
 
 /* ============================================================
+   FOREST — a treeline ringing the clearing, on the real terrain
+============================================================ */
+const trunkMat = new THREE.MeshLambertMaterial({color:0x4f3a28});
+const leafMat  = new THREE.MeshLambertMaterial({color:0x2f6b35});
+const conifMat = new THREE.MeshLambertMaterial({color:0x24523d});
+const TRUNK_C = [new THREE.Color('#4f3a28'), new THREE.Color('#161219')];
+const LEAF_C  = [new THREE.Color('#2f6b35'), new THREE.Color('#0e2418')];
+const CONIF_C = [new THREE.Color('#24523d'), new THREE.Color('#0b1d16')];
+
+function mergeGeos(list){
+  const pos=[], norm=[];
+  for(const g of list){
+    const n = g.index ? g.toNonIndexed() : g;
+    const p = n.attributes.position, nr = n.attributes.normal;
+    for(let i=0;i<p.count;i++){
+      pos.push(p.getX(i), p.getY(i), p.getZ(i));
+      norm.push(nr.getX(i), nr.getY(i), nr.getZ(i));
+    }
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(pos,3));
+  out.setAttribute('normal',   new THREE.Float32BufferAttribute(norm,3));
+  return out;
+}
+
+/* sample the same perlin terrain the ground/grass use, so trees sit on it */
+const noiseImg = new Image();
+noiseImg.src = TEX_NOISE;
+noiseImg.onload = ()=>{
+  const c = document.createElement('canvas');
+  c.width = noiseImg.width; c.height = noiseImg.height;
+  const cx = c.getContext('2d');
+  cx.drawImage(noiseImg, 0, 0);
+  const px = cx.getImageData(0, 0, c.width, c.height).data;
+  const texel = (ix, iy)=>{
+    ix = ((ix % c.width) + c.width) % c.width;
+    iy = Math.max(0, Math.min(c.height - 1, iy));
+    return px[(iy * c.width + ix) * 4];
+  };
+  const terrainY = (x, z)=>{
+    let u = (x/800) % 1; if(u < 0) u += 1;
+    let v = (z/800) % 1; if(v < 0) v += 1;
+    /* bilinear, matching the GPU's linear filtering */
+    const fx = u * c.width  - 0.5, fy = (1 - v) * c.height - 0.5;
+    const x0 = Math.floor(fx),  y0 = Math.floor(fy);
+    const tx = fx - x0, ty = fy - y0;
+    const r = ((texel(x0,y0)*(1-tx) + texel(x0+1,y0)*tx) * (1-ty)
+             + (texel(x0,y0+1)*(1-tx) + texel(x0+1,y0+1)*tx) * ty) / 255;
+    return 8 * (2*r - 1) - (x*x + z*z) / 480;
+  };
+  terrainHeight = terrainY;
+  settleCows(terrainY);
+  buildForest(terrainY);
+};
+
+function buildForest(terrainY){
+  const NT = IS_TOUCH ? 64 : 116;
+
+  const trunkGeo = new THREE.CylinderGeometry(0.32, 0.62, 8, 6);
+  trunkGeo.translate(0, 4, 0);
+
+  const canopyGeo = mergeGeos([
+    new THREE.IcosahedronGeometry(2.7, 1).translate(0,     9.4,  0),
+    new THREE.IcosahedronGeometry(1.9, 1).translate(1.9,   8.3,  0.6),
+    new THREE.IcosahedronGeometry(1.8, 1).translate(-1.7,  8.5, -0.9),
+    new THREE.IcosahedronGeometry(1.6, 1).translate(0.4,   7.8, -1.8),
+    new THREE.IcosahedronGeometry(1.5, 1).translate(-0.6,  8.0,  1.7)
+  ]);
+
+  const conifGeo = mergeGeos([
+    new THREE.ConeGeometry(3.1, 4.8, 7).translate(0, 6.4, 0),
+    new THREE.ConeGeometry(2.35, 4.2, 7).translate(0, 9.4, 0),
+    new THREE.ConeGeometry(1.55, 3.6, 7).translate(0, 12.0, 0)
+  ]);
+
+  /* place trees: ring beyond the camera's orbit, denser near the clearing edge */
+  const spots = [];
+  let tries = 0;
+  while(spots.length < NT && tries++ < NT*40){
+    const a = Math.random()*Math.PI*2;
+    const r = 53 + Math.pow(Math.random(), 0.8) * 36;     // 53..89 from the orbit centre
+    const x = Math.cos(a)*r, z = 10 + Math.sin(a)*r;      // ring the camera's path, not the origin
+    if(spots.some(s=>(s.x-x)*(s.x-x)+(s.z-z)*(s.z-z) < 38)) continue;
+    spots.push({x, z, s: rand(0.85, 1.5), rot: Math.random()*6.283,
+                tiltX: (Math.random()-0.5)*0.09, tiltZ: (Math.random()-0.5)*0.09,
+                conifer: Math.random() < 0.3});
+  }
+  const decid = spots.filter(s=>!s.conifer);
+  const conif = spots.filter(s=>s.conifer);
+
+  const trunks = new THREE.InstancedMesh(trunkGeo,  trunkMat, spots.length);
+  const leaves = new THREE.InstancedMesh(canopyGeo, leafMat,  decid.length);
+  const cones  = new THREE.InstancedMesh(conifGeo,  conifMat, conif.length);
+
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
+  const sv = new THREE.Vector3(), pv = new THREE.Vector3(), col = new THREE.Color();
+
+  spots.forEach((d, i)=>{
+    const y = terrainY(d.x, d.z) - 0.5;
+    e.set(d.tiltX, d.rot, d.tiltZ);                  // same lean as its canopy
+    q.setFromEuler(e);
+    sv.set(d.s*(d.conifer?0.75:1), d.s*(d.conifer?1.2:1), d.s*(d.conifer?0.75:1));
+    pv.set(d.x, y, d.z);
+    m.compose(pv, q, sv);
+    trunks.setMatrixAt(i, m);
+    d._y = y;
+  });
+  decid.forEach((d, i)=>{
+    e.set(d.tiltX, d.rot, d.tiltZ);                  // same lean as its trunk
+    q.setFromEuler(e);
+    sv.set(d.s*rand(0.85,1.2), d.s*rand(0.85,1.1), d.s*rand(0.85,1.2));
+    pv.set(d.x, d._y, d.z);
+    m.compose(pv, q, sv);
+    leaves.setMatrixAt(i, m);
+    leaves.setColorAt(i, col.setScalar(rand(0.76, 1.14)));
+  });
+  conif.forEach((d, i)=>{
+    e.set(d.tiltX, d.rot, d.tiltZ);                  // same lean as its trunk
+    q.setFromEuler(e);
+    sv.set(d.s*0.8, d.s*rand(1.05,1.35), d.s*0.8);
+    pv.set(d.x, d._y, d.z);
+    m.compose(pv, q, sv);
+    cones.setMatrixAt(i, m);
+    cones.setColorAt(i, col.setScalar(rand(0.78, 1.1)));
+  });
+  scene.add(trunks, leaves, cones);
+}
+
+/* ============================================================
+   ANIMALS — cows grazing, horses running laps, bunnies hopping
+============================================================ */
+let terrainHeight = (x, z)=>0;     // becomes the real sampler once the noise decodes
+const OC = {x: 0, z: 10};          // clearing centre (the camera's orbit centre)
+const SIGHTLINE = -1.25;           // default camera's line through the text
+const angDistTo = (a, b)=>Math.abs(Math.atan2(Math.sin(a-b), Math.cos(a-b)));
+const box = (w,h,d,mat,x,y,z,rz)=>{
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+  m.position.set(x,y,z);
+  if(rz) m.rotation.z = rz;
+  return m;
+};
+
+/* ---- cows: 4, scattered in the clearing, heads down in the grass ---- */
+const cows = [];
+{
+  const white = new THREE.MeshLambertMaterial({color:0xf0ede4});
+  const dark  = new THREE.MeshLambertMaterial({color:0x2b2b30});
+  const decal = new THREE.MeshLambertMaterial({color:0x2b2b30,
+    polygonOffset:true, polygonOffsetFactor:-2, polygonOffsetUnits:-2});
+  const pink  = new THREE.MeshLambertMaterial({color:0xc9907f});
+  for(let i=0;i<4;i++){
+    const g = new THREE.Group();
+    const s = i%2 ? 1 : -1;                               // mirror markings per cow
+    g.add(box(2.4,1.3,1.3, white, 0,1.55,0));             // body
+    g.add(box(0.62,0.72,0.72, white, 1.12,1.52,0));       // neck/chest into the head
+    /* Holstein markings as flush decal panels (~0.03 proud of the hide):
+       a saddle capping the hips that spills down one flank, a shoulder
+       spot on the opposite flank — one wrapped shape, not floating slabs */
+    g.add(box(0.95,0.05,1.30, decal, -0.62,2.175,0));       // saddle cap: top face AT the back
+    g.add(box(0.95,0.72,0.04, decal, -0.62,1.79, s*0.63));  // flank spill: face AT the hide
+    g.add(box(0.62,0.5,0.04, decal, 0.42,1.64, -s*0.63));   // shoulder spot, other flank
+    if(i < 2) g.add(box(0.5,0.38,0.04, decal, -0.05,1.28, s*0.63)); // low belly spot
+    const head = new THREE.Group();
+    head.position.set(1.2,1.85,0);
+    head.add(box(0.8,0.65,0.66, white, 0.5,-0.1,0));
+    head.add(box(0.3,0.28,0.5, pink, 0.95,-0.22,0));        // muzzle
+    head.add(box(0.3,0.32,0.04, decal, 0.55,0.0, s*0.31));  // eye patch: painted on the cheek
+    head.add(box(0.34,0.1,0.16, dark, 0.35,0.28,0.38));     // dark ears
+    head.add(box(0.34,0.1,0.16, dark, 0.35,0.28,-0.38));
+    g.add(head);
+    const legs = [];
+    [[0.85,0.45],[0.85,-0.45],[-0.85,0.45],[-0.85,-0.45]].forEach(([lx,lz])=>{
+      const leg = new THREE.Group();
+      leg.position.set(lx, 1.0, lz);                       // pivot at the hip
+      leg.add(box(0.24,0.95,0.24, white, 0,-0.5,0));
+      leg.add(box(0.27,0.16,0.27, dark, 0,-0.92,0));       // hoof
+      g.add(leg); legs.push(leg);
+    });
+    const tail = box(0.09,0.95,0.09, white, -1.28,1.6,0, 0.35);
+    g.add(tail);
+    const a = (i/4)*Math.PI*2 + rand(-0.4,0.4);
+    const r = rand(23, 31);                                // keep clear of the text
+    const x = OC.x + Math.cos(a)*r, z = OC.z + Math.sin(a)*r;
+    g.position.set(x, 0, z);
+    const heading = Math.random()*Math.PI*2;
+    g.rotation.y = heading;
+    g.scale.setScalar(1.55);
+    scene.add(g);
+    cows.push({g, head, tail, legs, x, z, ph: rand(0,6),
+               heading, state:'graze', timer: rand(3, 10), tx:x, tz:z});
+  }
+}
+
+/* ---- horses: 2, galloping a wide loop around the clearing ---- */
+const horses = [];
+{
+  for(let i=0;i<2;i++){
+    const coat = new THREE.MeshLambertMaterial({color: i===0 ? 0x7a4f33 : 0x4a3a32});
+    const dk   = new THREE.MeshLambertMaterial({color: 0x2e2018});
+    const g = new THREE.Group();
+    g.add(box(2.2,1.0,0.92, coat, 0,2.05,0));
+    const headGrp = new THREE.Group();                   // pivots at the shoulder
+    headGrp.position.set(0.75, 2.45, 0);
+    headGrp.add(box(0.55,1.25,0.5, coat, 0.25,0.3,0, -0.5));   // neck
+    headGrp.add(box(0.16,1.1,0.42, dk,  0.07,0.5,0, -0.5));    // mane
+    headGrp.add(box(0.85,0.45,0.44, coat, 0.87,0.85,0, -0.15)); // head
+    headGrp.add(box(0.2,0.22,0.12, coat, 0.73,1.17,0.13));      // ears
+    headGrp.add(box(0.2,0.22,0.12, coat, 0.73,1.17,-0.13));
+    g.add(headGrp);
+    const legs = [];
+    [[0.82,0.32],[0.82,-0.32],[-0.82,0.32],[-0.82,-0.32]].forEach(([lx,lz])=>{
+      const leg = new THREE.Group();
+      leg.position.set(lx, 2.0, lz);
+      leg.add(box(0.21,1.6,0.21, coat, 0,-0.8,0));
+      g.add(leg); legs.push(leg);
+    });
+    const tail = box(0.14,1.05,0.14, dk, -1.25,2.35,0, 0.65);
+    g.add(tail);
+    g.scale.setScalar(1.35);
+    scene.add(g);
+    horses.push({g, legs, tail, headGrp, a: i*Math.PI, R: 36, w: 0.23, ph: rand(0,6)});
+  }
+}
+
+/* ---- bunnies: 3, hop-pause-hop around the clearing ---- */
+const bunnies = [];
+{
+  const colors = [0xd8cfc2, 0x9b8b79, 0xefeae2];
+  for(let i=0;i<3;i++){
+    const fur = new THREE.MeshLambertMaterial({color: colors[i]});
+    const g = new THREE.Group();
+    g.add(box(0.55,0.45,0.45, fur, 0,0.34,0));
+    g.add(box(0.38,0.36,0.36, fur, 0.32,0.62,0));
+    const earL = box(0.08,0.42,0.13, fur, 0.34,0.97,0.09, -0.12);
+    const earR = box(0.08,0.42,0.13, fur, 0.34,0.97,-0.09, -0.12);
+    g.add(earL, earR);
+    g.add(box(0.16,0.16,0.16, new THREE.MeshLambertMaterial({color:0xffffff}), -0.3,0.42,0));
+    const a = Math.random()*Math.PI*2, r = rand(12, 30);
+    bunnies.push({
+      g, earL, earR,
+      x: OC.x + Math.cos(a)*r, z: OC.z + Math.sin(a)*r,
+      dir: Math.random()*Math.PI*2,
+      state: 'idle', timer: rand(0.4, 2), hopT: 0, ph: rand(0,6)
+    });
+    g.scale.setScalar(1.15);
+    scene.add(g);
+  }
+}
+
+/* ---- sleepy Z's: a sprite pool drifting up from dozing heads ---- */
+const zTex = (()=>{
+  const c = document.createElement('canvas'); c.width = c.height = 64;
+  const x = c.getContext('2d');
+  x.font = '700 46px Georgia, serif';
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.shadowColor = 'rgba(180,200,255,0.8)'; x.shadowBlur = 8;
+  x.fillStyle = '#eef2ff';
+  x.fillText('Z', 32, 34);
+  return new THREE.CanvasTexture(c);
+})();
+const zPool = [];
+for(let i=0;i<14;i++){
+  const m = new THREE.SpriteMaterial({map:zTex, transparent:true, opacity:0, depthWrite:false, fog:false});
+  const sp = new THREE.Sprite(m);
+  sp.visible = false;
+  scene.add(sp);
+  zPool.push({sp, m, life:0, alive:false, sway:0});
+}
+const _hw = new THREE.Vector3();
+function spawnZ(obj, up){
+  const z = zPool.find(z=>!z.alive);
+  if(!z) return;
+  obj.getWorldPosition(_hw);
+  z.alive = true; z.life = 0; z.sway = rand(0, 6);
+  z.sp.position.set(_hw.x, _hw.y + up, _hw.z);
+  z.sp.visible = true;
+}
+
+function settleCows(terrainY){
+  const AVOID = -1.25;            // the default camera's sightline through the text
+  const angDist = (a, b)=>Math.abs(Math.atan2(Math.sin(a-b), Math.cos(a-b)));
+  const placed = [];
+  for(const c of cows){
+    let x = c.x, z = c.z, tries = 0;
+    while(tries++ < 400){
+      const a = Math.random()*Math.PI*2;
+      const r = rand(25, 31);
+      const tx = OC.x + Math.cos(a)*r, tz = OC.z + Math.sin(a)*r;
+      const ang = Math.atan2(tz - OC.z, tx - OC.x);
+      if(Math.min(angDist(ang, AVOID), angDist(ang, AVOID + Math.PI)) < 0.65) continue;
+      const h = terrainY(tx, tz);
+      if(h > 1.0) continue;
+      const slope = Math.max(
+        Math.abs(terrainY(tx + 1.6, tz) - h),
+        Math.abs(terrainY(tx, tz + 1.6) - h));
+      if(slope > 0.35) continue;
+      if(placed.some(p=>(p.x-tx)*(p.x-tx)+(p.z-tz)*(p.z-tz) < 49)) continue;
+      x = tx; z = tz;
+      break;
+    }
+    c.x = x; c.z = z;
+    placed.push({x, z});
+  }
+}
+
+function updateAnimals(dt, t){
+  /* how asleep the meadow is: eases in past dusk, fully out by deep night */
+  const sk = Math.min(1, Math.max(0, (night - 0.45)/0.4));
+
+  /* cows: graze and amble by day; fold down and doze by night */
+  for(const c of cows){
+    if(c.abducted) continue;                 // the saucer has it now
+    c.tail.rotation.x = Math.sin(t*2.2 + c.ph)*0.3*(1 - sk*0.85);
+
+    if(sk > 0.15 && c.state === 'walk'){ c.state = 'graze'; c.timer = rand(2, 5); }
+
+    if(c.state === 'walk'){
+      const dx = c.tx - c.x, dz = c.tz - c.z;
+      const d = Math.hypot(dx, dz);
+      const want = Math.atan2(-dz, dx);
+      const dh = Math.atan2(Math.sin(want - c.heading), Math.cos(want - c.heading));
+      c.heading += dh * Math.min(1, 2.2*dt);
+      const step = Math.min(d, 1.1 * dt);
+      c.x += Math.cos(c.heading) * step;
+      c.z += -Math.sin(c.heading) * step;
+      c.g.rotation.y = c.heading;
+      c.head.rotation.z = -0.12 + Math.sin(t*1.4 + c.ph)*0.05;
+      const sw = Math.sin(t*5 + c.ph) * 0.3;
+      c.legs.forEach((leg, j)=>{ leg.rotation.z = (j===0 || j===3) ? sw : -sw; });
+      if(d < 0.2){ c.state = 'graze'; c.timer = rand(6, 16); }
+    } else {
+      c.timer -= dt;
+      const awake = -0.55 - 0.4*Math.max(0, Math.sin(t*0.14 + c.ph))
+                    + Math.sin(t*1.6 + c.ph)*0.06;
+      const asleep = -0.22 + Math.sin(t*1.1 + c.ph)*0.03;       // slow breathing
+      c.head.rotation.z = awake*(1 - sk) + asleep*sk;
+      c.legs.forEach((leg, j)=>{
+        const fold = (j < 2 ? 1 : -1) * 1.3 * sk;               // tuck under to lie down
+        leg.rotation.z += (fold - leg.rotation.z) * Math.min(1, 3*dt);
+      });
+      if(sk < 0.15 && c.timer <= 0){
+        for(let k=0; k<24; k++){
+          const wa = Math.random()*Math.PI*2;
+          const wd = rand(2.5, 5.5);
+          const nx = c.x + Math.cos(wa)*wd, nz = c.z + Math.sin(wa)*wd;
+          const rr = Math.hypot(nx - OC.x, nz - OC.z);
+          if(rr < 24 || rr > 32) continue;
+          const na = Math.atan2(nz - OC.z, nx - OC.x);
+          if(Math.min(angDistTo(na, SIGHTLINE), angDistTo(na, SIGHTLINE + Math.PI)) < 0.65) continue;
+          if(Math.abs(terrainHeight(nx, nz) - terrainHeight(c.x, c.z)) > 0.5) continue;
+          if(cows.some(o=>o !== c && (o.x-nx)*(o.x-nx) + (o.z-nz)*(o.z-nz) < 30)) continue;
+          c.tx = nx; c.tz = nz; c.state = 'walk';
+          break;
+        }
+        if(c.state !== 'walk') c.timer = rand(4, 9);
+      }
+    }
+    c.g.position.set(c.x, terrainHeight(c.x, c.z) - 0.08 - 0.78*sk, c.z);
+  }
+
+  /* horses: gallop by day; halt and doze standing (as horses do) by night */
+  for(const h of horses){
+    h.a += h.w * dt * (1 - sk);
+    const x = OC.x + Math.cos(h.a)*h.R;
+    const z = OC.z + Math.sin(h.a)*h.R;
+    const dx = -Math.sin(h.a), dz = Math.cos(h.a);
+    const bounce = Math.abs(Math.sin(t*4.6 + h.ph))*0.3*(1 - sk);
+    h.g.position.set(x, terrainHeight(x, z) + bounce, z);
+    h.g.rotation.y = Math.atan2(-dz, dx);
+    h.g.rotation.z = Math.sin(t*4.6 + h.ph)*0.04*(1 - sk);
+    h.legs.forEach((leg, j)=>{
+      const pair = (j===0 || j===3) ? 0 : Math.PI;
+      leg.rotation.z = Math.sin(t*9.2 + pair + h.ph)*0.62*(1 - sk);
+    });
+    h.tail.rotation.x = Math.sin(t*3.1 + h.ph)*0.2*(1 - sk*0.8);
+    h.headGrp.rotation.z = (-0.55 + Math.sin(t*1.0 + h.ph)*0.03) * sk;   // drooped, breathing
+  }
+
+  /* bunnies: hop by day; hunker down, ears back, by night */
+  for(const b of bunnies){
+    b.g.scale.set(1.15, 1.15*(1 - 0.16*sk), 1.15);
+    if(b.state === 'idle'){
+      b.timer -= dt;
+      const wiggleL = Math.sin(t*5 + b.ph)*0.12;
+      const wiggleR = Math.sin(t*5.7 + b.ph)*0.12;
+      b.earL.rotation.x = wiggleL*(1 - sk) + 0.85*sk;
+      b.earR.rotation.x = wiggleR*(1 - sk) + 0.85*sk;
+      b.g.position.set(b.x, terrainHeight(b.x, b.z), b.z);
+      if(sk < 0.4 && b.timer <= 0){
+        const distC = Math.hypot(b.x - OC.x, b.z - OC.z);
+        b.dir = distC > 30
+          ? Math.atan2(OC.z - b.z, OC.x - b.x) + rand(-0.7, 0.7)
+          : Math.random()*Math.PI*2;
+        b.state = 'hop'; b.hopT = 0;
+        b.g.rotation.y = Math.atan2(-Math.sin(b.dir), Math.cos(b.dir));
+      }
+    } else {
+      b.hopT += dt / 0.42;
+      const p = Math.min(b.hopT, 1);
+      const step = 1.35 * dt / 0.42;
+      b.x += Math.cos(b.dir)*step;
+      b.z += Math.sin(b.dir)*step;
+      b.g.position.set(b.x, terrainHeight(b.x, b.z) + Math.sin(Math.PI*p)*0.55, b.z);
+      if(p >= 1){ b.state = 'idle'; b.timer = rand(0.3, 2.2); }
+    }
+  }
+
+  /* floating Z's: every cow and horse snores on its own rhythm */
+  if(sk > 0.9){
+    for(const c of cows){
+      if(c.abducted || !c.g.visible) continue;
+      c.zt = (c.zt === undefined ? rand(0, 1.8) : c.zt) - dt;
+      if(c.zt <= 0){ c.zt = rand(1.4, 2.4); spawnZ(c.head, 1.2); }
+    }
+    for(const h of horses){
+      h.zt = (h.zt === undefined ? rand(0, 1.8) : h.zt) - dt;
+      if(h.zt <= 0){ h.zt = rand(1.4, 2.4); spawnZ(h.headGrp, 2.0); }
+    }
+  }
+  for(const z of zPool){
+    if(!z.alive) continue;
+    z.life += dt;
+    const p = z.life / 2.4;
+    if(p >= 1){ z.alive = false; z.sp.visible = false; z.m.opacity = 0; continue; }
+    z.sp.position.y += 1.1 * dt;
+    z.sp.position.x += Math.sin(t*1.8 + z.sway) * 0.35 * dt;
+    const sc = 1.0 + p*1.3;
+    z.sp.scale.set(sc, sc, 1);
+    z.m.opacity = Math.sin(Math.PI * p) * 0.85 * sk;
+  }
+}
+
+/* ============================================================
    LIGHTS
 ============================================================ */
 const ambientLight = new THREE.AmbientLight(0xffffff, DAY.ambient);
@@ -942,7 +1377,7 @@ const TRAIL_TEX = trailTexture();
 
 function spawnPlane(){
   const g = new THREE.Group();
-  const mat = new THREE.MeshBasicMaterial({color:0xe3e8ee, transparent:true});
+  const mat = new THREE.MeshBasicMaterial({color:0xe3e8ee, transparent:true, fog:false});
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22,0.22,3.2,8), mat);
   body.rotation.z = Math.PI/2;
   const nose = new THREE.Mesh(new THREE.ConeGeometry(0.22,0.6,8), mat);
@@ -952,7 +1387,7 @@ function spawnPlane(){
   const tail = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.85,0.07), mat);
   tail.position.set(-1.5, 0.42, 0);
   const trailMat = new THREE.MeshBasicMaterial({map:TRAIL_TEX, transparent:true, opacity:0.5,
-    depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending});
+    depthWrite:false, side:THREE.DoubleSide, blending:THREE.AdditiveBlending, fog:false});
   const trail = new THREE.Mesh(new THREE.PlaneGeometry(34, 0.42), trailMat);
   trail.position.x = -18.5;
   g.add(body, nose, wings, tail, trail);
@@ -976,42 +1411,144 @@ function spawnPlane(){
 
 function spawnUFO(){
   const g = new THREE.Group();
-  const bodyMat = new THREE.MeshStandardMaterial({color:0x49566e, metalness:0.85, roughness:0.3, transparent:true});
+  const bodyMat = new THREE.MeshStandardMaterial({color:0x49566e, metalness:0.85, roughness:0.3, transparent:true, fog:false});
   const body = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), bodyMat);
   body.scale.set(1.7, 0.42, 1.7);
   const domeMat = new THREE.MeshStandardMaterial({color:0x9ff2ff, emissive:0x6fe8ff,
-    emissiveIntensity:0.9, transparent:true, opacity:0.85, roughness:0.15});
+    emissiveIntensity:0.9, transparent:true, opacity:0.85, roughness:0.15, fog:false});
   const dome = new THREE.Mesh(new THREE.SphereGeometry(0.62, 16, 10, 0, Math.PI*2, 0, Math.PI/2), domeMat);
   dome.position.y = 0.3;
   g.add(body, dome);
   const lightMats = [];
   for(let i=0;i<6;i++){
-    const lm = new THREE.MeshBasicMaterial({color:0xffd24a, transparent:true});
+    const lm = new THREE.MeshBasicMaterial({color:0xffd24a, transparent:true, fog:false});
     lightMats.push(lm);
     const l = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 6), lm);
     const a = i/6*Math.PI*2;
     l.position.set(Math.cos(a)*1.45, -0.08, Math.sin(a)*1.45);
     g.add(l);
   }
+
+  /* tractor beam: cone of light + glowing ground disc */
+  const beamMat = new THREE.MeshBasicMaterial({color:0x8ff7d0, transparent:true, opacity:0,
+    depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide, fog:false});
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 1.5, 1, 18, 1, true), beamMat);
+  beam.visible = false;
+  g.add(beam);
+  const ringMat = beamMat.clone();
+  const ring = new THREE.Mesh(new THREE.CircleGeometry(6.2, 28), ringMat);
+  ring.rotation.x = -Math.PI/2;
+  ring.visible = false;
+  scene.add(ring);
+
+  /* prefer cows behind the text (far side of the clearing from the default view) —
+     the abduction plays out as a backdrop instead of blocking the foreground */
+  const candidates = cows.filter(c=>!c.abducted && c.g.visible);
+  candidates.sort((a, b)=>
+    angDistTo(Math.atan2(a.z - OC.z, a.x - OC.x), SIGHTLINE) -
+    angDistTo(Math.atan2(b.z - OC.z, b.x - OC.x), SIGHTLINE));
+  const pool = candidates.slice(0, Math.min(2, candidates.length));
+  const target = pool.length ? pool[(Math.random()*pool.length)|0] : null;
+
   const dirRight = Math.random() < 0.5;
-  const y0 = rand(40, 55), z = rand(-110, -70);
   let x = dirRight ? -280 : 280;
-  let tt = 0;
-  g.position.set(x, y0, z);
+  let zPos = rand(-110, -70), yPos = rand(40, 55);
+  let tt = 0, bt = 0, fleeV = 0, fleeDir = 1, bank = 0;
+  let state = target ? 'approach' : 'cruise';
+  g.position.set(x, yPos, zPos);
   g.scale.setScalar(4.4);
   scene.add(g);
+
   flyers.push({
-    mats: [bodyMat, domeMat], fadeWith: 'night',
+    mats: [bodyMat, domeMat], fadeWith: 'night', extra: [ring],
     update(dt, t){
       tt += dt;
-      const dart = 1 + Math.max(0, Math.sin(tt*0.9)) * (Math.sin(tt*4.5) > 0.7 ? 4 : 0);
-      x += (dirRight ? 1 : -1) * 34 * dart * dt;
-      g.position.set(x, y0 + Math.sin(tt*2.2)*4, z);
-      g.rotation.z = Math.sin(tt*3)*0.12;
-      g.rotation.y += dt*2.5;
       const fade = Math.min(1, night*1.4);
       lightMats.forEach((m,i)=>{ m.opacity = (Math.sin(t*9 + i*1.05) > 0 ? 1 : 0.15) * fade; });
-      return Math.abs(x) < 300;
+      g.rotation.y += dt*2.2;
+
+      if(state === 'cruise'){
+        /* a calm survey pass: steady speed, long lazy weave */
+        x += (dirRight ? 1 : -1) * 24 * dt;
+        g.position.set(x, yPos + Math.sin(tt*0.9)*3, zPos + Math.sin(tt*0.55)*6);
+        g.rotation.z = Math.sin(tt*0.9)*0.07;
+        return Math.abs(x) < 310;
+      }
+
+      if(state === 'approach'){
+        /* cruise at a watchable speed, then decelerate smoothly into the hover */
+        const gnd = terrainHeight(target.x, target.z);
+        const hx = target.x, hy = gnd + 26, hz = target.z;
+        const dx = hx - g.position.x, dy = hy - g.position.y, dz = hz - g.position.z;
+        const d = Math.hypot(dx, dy, dz);
+        const speed = Math.min(55, d * 1.5);        // capped cruise; eases off near arrival
+        const step = Math.min(d, speed * dt);
+        if(d > 1e-4){
+          g.position.x += dx/d * step;
+          g.position.y += dy/d * step;
+          g.position.z += dz/d * step;
+        }
+        /* bank with actual lateral velocity, level out as it slows */
+        const bankTarget = Math.max(-0.16, Math.min(0.16, -(dx/d) * speed * 0.003));
+        bank += (bankTarget - bank) * Math.min(1, 4*dt);
+        g.rotation.z = bank;
+        g.position.y += Math.sin(tt*1.6)*0.04;      // faint hover breathing en route
+        if(d < 1.5){ state = 'beam'; bt = 0; target.abducted = true; }
+        return true;
+      }
+
+      if(state === 'beam'){
+        bt += dt;
+        const gnd = terrainHeight(target.x, target.z);
+        /* hold the hover with damping — no hard snapping */
+        const k = 1 - Math.exp(-3 * dt);
+        g.position.x += (target.x - g.position.x) * k;
+        g.position.z += (target.z - g.position.z) * k;
+        g.position.y += (gnd + 26 + Math.sin(tt*2.0)*0.5 - g.position.y) * k;
+        bank += (0 - bank) * k;
+        g.rotation.z = bank;
+
+        const beamIn  = Math.min(bt/0.45, 1);
+        const beamOut = bt > 3.4 ? Math.max(0, 1 - (bt-3.4)/0.4) : 1;
+        const beamK = beamIn * beamOut;
+        const pulse = 0.8 + 0.2*Math.sin(t*7);
+        const lenWorld = (g.position.y - gnd) / 4.4;
+        beam.visible = beamK > 0.01;
+        beam.scale.y = lenWorld;
+        beam.position.y = -lenWorld/2;
+        beamMat.opacity = 0.3 * beamK * pulse * fade;
+        ring.visible = beam.visible;
+        ring.position.set(target.x, gnd + 0.15, target.z);
+        const rp = 1 + 0.08*Math.sin(t*6);
+        ring.scale.set(rp, rp, rp);
+        ringMat.opacity = 0.34 * beamK * pulse * fade;
+
+        const lift = Math.min(Math.max((bt - 0.5)/2.6, 0), 1);
+        const ease = lift*lift*(3 - 2*lift);
+        target.g.position.y = gnd + ease * (26 - 1.6);    // rides right up to the hull
+        target.g.rotation.y += dt * (0.8 + 3.2*ease);
+        target.g.rotation.z = Math.sin(t*2.2)*0.12*ease;
+        /* shrinks all the way to zero exactly as it meets the ship — no pop */
+        const shrink = lift > 0.7 ? Math.max(0.001, 1 - (lift - 0.7)/0.28) : 1;
+        target.g.scale.setScalar(1.55 * shrink);
+
+        if(bt > 3.8){
+          target.g.visible = false;
+          state = 'flee';
+          fleeDir = g.position.x >= 0 ? 1 : -1;   // nearest horizon
+          fleeV = 0;
+        }
+        return true;
+      }
+
+      /* flee: ramps up smoothly, climbing out, banked into the run */
+      fleeV = Math.min(fleeV + 50*dt, 78);
+      const climb = Math.min(1, fleeV/50);
+      g.position.x += fleeDir * fleeV * dt;
+      g.position.y += 8 * climb * dt;
+      bank += ((fleeDir * -0.16 * climb) - bank) * Math.min(1, 3*dt);
+      g.rotation.z = bank;
+      return Math.abs(g.position.x) < 330;
     },
     obj: g
   });
@@ -1030,7 +1567,7 @@ const comets = [];
   const tex = new THREE.CanvasTexture(c);
   for(let i=0;i<3;i++){
     const mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, opacity:0,
-      depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide});
+      depthWrite:false, blending:THREE.AdditiveBlending, side:THREE.DoubleSide, fog:false});
     const m = new THREE.Mesh(new THREE.PlaneGeometry(30, 0.7), mat);
     m.visible = false;
     scene.add(m);
@@ -1140,6 +1677,17 @@ addEventListener('keydown', e=>{ if(e.key==='Escape') overlay.classList.remove('
 const toggle = document.getElementById('modeToggle');
 toggle.addEventListener('click', ()=>{
   nightTarget = nightTarget ? 0 : 1;
+  if(!nightTarget){
+    /* dawn: the abducted come home, a little dizzy but fine */
+    cows.forEach(c=>{
+      if(c.abducted){
+        c.abducted = false;
+        c.g.visible = true;
+        c.g.scale.setScalar(1.55);
+        c.g.rotation.z = 0;
+      }
+    });
+  }
   document.body.classList.toggle('night', !!nightTarget);
   toggle.setAttribute('aria-label', nightTarget ? 'Switch to day mode' : 'Switch to night mode');
 });
@@ -1188,6 +1736,11 @@ function applyMode(n){
 
   pMat.color.copy(DAY.particleColor).lerp(NIGHT.particleColor, n);
   pMat.opacity = lerp(DAY.particleOpacity, NIGHT.particleOpacity, n);
+
+  scene.fog.color.copy(FOG_SCN[0]).lerp(FOG_SCN[1], n);
+  trunkMat.color.copy(TRUNK_C[0]).lerp(TRUNK_C[1], n);
+  leafMat.color.copy(LEAF_C[0]).lerp(LEAF_C[1], n);
+  conifMat.color.copy(CONIF_C[0]).lerp(CONIF_C[1], n);
 }
 
 /* ============================================================
@@ -1310,6 +1863,8 @@ function tick(){
     }
   }
 
+  updateAnimals(dt, t);
+
   /* night comets */
   if(n > 0.6 && !REDUCED){
     cometTimer += dt;
@@ -1329,7 +1884,11 @@ function tick(){
       if(m.userData.baseOpacity === undefined) m.userData.baseOpacity = m.opacity;
       m.opacity = m.userData.baseOpacity * Math.min(1, fade*1.4);
     });
-    if(!alive){ scene.remove(f.obj); flyers.splice(i,1); }
+    if(!alive){
+      scene.remove(f.obj);
+      if(f.extra) f.extra.forEach(o=>scene.remove(o));
+      flyers.splice(i,1);
+    }
   }
 
   renderer.clear();
